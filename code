@@ -1,0 +1,655 @@
+import sqlite3  # Импорт библиотеки для работы с базой данных SQLite
+import pandas as pd  # Импорт библиотеки для работы с данными в формате DataFrame
+from tkinter import *  # Импорт всех компонентов tkinter для создания GUI
+from tkinter import ttk, messagebox  # Импорт дополнительных компонентов и сообщений
+
+# Функция для создания базы данных и таблиц для пользователей и вакансий
+def create_db():
+    conn = sqlite3.connect('users.db')  # создаем или открываем базу данных
+    cursor = conn.cursor()  # создаем курсор для выполнения SQL-запросов
+
+    # Создаем таблицы, если они еще не существуют
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL
+    )
+    ''')
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS vacancies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        company TEXT NOT NULL,
+        location TEXT NOT NULL,
+        description TEXT NOT NULL
+    )
+    ''')
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS resumes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+
+    # Проверяем, есть ли вакансии в базе данных, если нет, то добавляем примерные данные
+    cursor.execute('SELECT COUNT(*) FROM vacancies')
+    if cursor.fetchone()[0] == 0:  # Если таблица вакансии пуста
+        cursor.execute('''
+        INSERT INTO vacancies (title, company, location, description) VALUES 
+        ('Ветеринар', 'Дог-Френдли', 'Москва', 'Необходимо: иметь образование ветеринара'),
+        ('Бухгалтер', 'Совкомбанк', 'Санкт-Петербург', 'Необходимо: хорошее умение пользоваться Excel, Word'),
+        ('РБГ', 'Совкомбанк', 'Екатеринбург', 'Обязанности: собеседования, отслеживание новых резюме'), 
+        ('Строитель', 'Строитель-РФ', 'Санкт-Петербург', 'Можно без опыта'),
+        ('Строитель', 'Строитель-РФ', 'Москва', 'Требуемый опыт работы: 3-4 года'),
+        ('Строитель', 'Строитель-Онлайн', 'Москва', 'Требуемый опыт работы: 3-4 года'),
+        ('Ветеринар', 'Дог-Френдли', 'Екатеринбург', 'Необходимо: иметь образование ветеринара'),
+        ('Ветеринар', 'Собака и Точка', 'Москва', 'Необходимо: иметь образование ветеринара'),
+        ('Ветеринар', 'Дог-Френдли', 'Санкт-Петербург', 'Необходимо: иметь образование ветеринара'),
+        ('Бухгалтер', 'Совкомбанк', 'Москва', 'Необходимо: хорошее умение пользоваться Excel, Word'),
+        ('Бухгалтер', 'Совкомбанк', 'Санкт-Петербург', 'Можно без опыта!'),
+        ('Бухгалтер', 'Т-банк', 'Москва', 'Необходимо: хорошее умение пользоваться Excel, Word'),
+        ('IT-специалист', 'Совкомбанк', 'Санкт-Петербург', 'Можно без опыта'),
+        ('IT-специалист', 'Т-банк', 'Москва', 'Требуемый опят работы: 1-2 года'),
+        ('IT-специалист', 'Айфон-Сити', 'Тверь', 'Можно без опыта'),
+        ('IT-специалист', 'Айфон-Сити', 'Тверь', 'Можно без опыта'),
+        ('Повар в детский сад', 'Детский сад Cолнышки', 'Екатеренбург', 'Необходимо: иметь образование повара'),
+        ('Повар в детский сад', 'Детский сад Радуга', 'Москва', 'Необходимо: иметь образование повара'),
+        ('Повар', 'Ресторан Ван Дам', 'Екатеренбург', 'Необходимо: иметь образование повара'),
+        ('Повар-кондитер', 'Ресторан Ван Дам', 'Екатеренбург', 'Необходимо: иметь образование повара'),
+        ('Повар', 'Ресторан Ван Дам', 'Москва', 'Необходимо: иметь образование повара'),
+        ('Повар-кондитер', 'Ресторан Ван Дам', 'Москва', 'Необходимо: иметь образование повара'),
+        ('Шеф повар', 'Ресторан Ван Дам', 'Екатеринбург', 'Необходимо: иметь образование повара'),
+        ('Повар', 'Кафе-ресторан', 'Тверь', 'Можно без опыта работы!'),
+        ('Повар-кондитер', 'Кафе-ресторан', 'Екатеринбург', 'Необходимо: иметь образование повара')
+        ''')
+
+    conn.commit()  # сохраняем изменения
+    conn.close()  # закрываем соединение
+
+# Создаем базу данных при запуске программы
+create_db()
+
+def export_vacancies_to_excel():
+    conn = sqlite3.connect('users.db')  # открываем соединение с базой данных
+    df = pd.read_sql_query("SELECT * FROM vacancies", conn)  # считываем данные о вакансиях в DataFrame
+    conn.close()  # закрываем соединение
+
+    try:
+        df.to_excel("vacancies.xlsx", index=False)  # Экспортируем данные в файл Excel
+        messagebox.showinfo("Success", "Данные о вакансиях успешно экспортированы в 'vacancies.xlsx'")  # Показываем сообщение об успехе
+    except Exception as e:
+        messagebox.showerror("Error", f"Не удалось экспортировать данные: {str(e)}")  # Показываем сообщение об ошибке
+
+def open_vacancies_window(user_id):  # Функция для отображения вакансий
+    vacancies_window = Toplevel()  # Создаем верхнее окно
+    vacancies_window.title("Вакансии")  # Устанавливаем заголовок окна
+    vacancies_window.geometry("600x600")  # Устанавливаем размеры окна
+
+    # Создаем таблицу для отображения вакансий
+    tree = ttk.Treeview(vacancies_window, columns=("ID", "Title", "Company", "Description"), show="headings")
+    tree.heading("ID", text="ID")  # Заголовок колонки ID
+    tree.heading("Title", text="Название")  # Заголовок колонки Название
+    tree.heading("Company", text="Компания")  # Заголовок колонки Компания
+    tree.heading("Description", text="Описание")  # Заголовок колонки Описание
+
+    # Загружаем данные о вакансиях из базы данных
+    conn = sqlite3.connect('users.db')  # открываем соединение
+    cursor = conn.cursor()  # создаем курсор
+    cursor.execute("SELECT * FROM vacancies")  # Выполняем запрос на получение вакансий
+    vacancies = cursor.fetchall()  # Получаем все вакансии
+
+    for vacancy in vacancies:  # Вставляем вакансии в таблицу
+        tree.insert("", "end", values=vacancy)  # Добавляем данные вакансий в таблицу
+
+    tree.pack(expand=True, fill='both')  # Упаковываем дерево для отображения
+
+    # Кнопка для загрузки резюме
+    btn_upload_resume = ttk.Button(vacancies_window, text="Загрузить резюме",
+                                   command=lambda: open_resume_window(user_id))
+    btn_upload_resume.pack(pady=10)  # Упаковка кнопки
+
+    # Кнопка для редактирования резюме
+    btn_edit_resume = ttk.Button(vacancies_window, text="Редактировать резюме",
+                                 command=lambda: open_edit_resume_window(user_id))
+    btn_edit_resume.pack(pady=10)  # Упаковка кнопки
+
+    # Кнопка "Назад"
+    btn_back = ttk.Button(vacancies_window, text="Назад", command=vacancies_window.destroy)
+    btn_back.pack(pady=10)  # Упаковка кнопки
+
+    conn.close()  # Закрываем соединение
+
+def open_edit_resume_window(user_id):  # Окно для редактирования резюме
+    edit_resume_window = Toplevel()  # Создаем верхнее окно
+    edit_resume_window.title("Редактировать резюме")  # Устанавливаем заголовок
+    edit_resume_window.geometry("500x500")  # Устанавливаем размеры окна
+
+    # Получаем текущее резюме пользователя
+    conn = sqlite3.connect('users.db')  # открываем соединение
+    cursor = conn.cursor()  # создаем курсор
+    cursor.execute("SELECT * FROM resumes WHERE user_id=?", (user_id,))  # Получаем резюме пользователя
+    resume = cursor.fetchone()  # Получаем одно резюме
+    conn.close()  # Закрываем соединение
+
+    if not resume:  # Если резюме не найдено
+        messagebox.showinfo("Информация", "У вас нет резюме для редактирования.")  # Показываем сообщение
+        return  # Выход из функции
+
+    # Разделяем заголовок на части
+    header_parts = resume[2].split(" - ")  # Делим заголовок резюме
+    names = header_parts[0].split(" ")  # Разделяем имя на части
+
+    first_name = names[0] if len(names) > 0 else ""
+    last_name = names[1] if len(names) > 1 else ""
+    middle_name = names[2] if len(names) > 2 else ""
+
+    # Поля для редактирования
+    lbl_first_name = Label(edit_resume_window, text="Имя:")  # Метка для имени
+    lbl_first_name.pack(pady=5)  # Упаковка метки
+    entry_first_name = Entry(edit_resume_window)  # Поле ввода имени
+    entry_first_name.insert(0, first_name)  # Ввод текущего имени
+    entry_first_name.pack(pady=5)  # Упаковка поля
+
+    lbl_last_name = Label(edit_resume_window, text="Фамилия:")  # Метка для фамилии
+    lbl_last_name.pack(pady=5)  # Упаковка метки
+    entry_last_name = Entry(edit_resume_window)  # Поле ввода фамилии
+    entry_last_name.insert(0, last_name)  # Ввод текущей фамилии
+    entry_last_name.pack(pady=5)  # Упаковка поля
+
+    lbl_middle_name = Label(edit_resume_window, text="Отчество:")  # Метка для отчества
+    lbl_middle_name.pack(pady=5)  # Упаковка метки
+    entry_middle_name = Entry(edit_resume_window)  # Поле ввода отчества
+    entry_middle_name.insert(0, middle_name)  # Ввод текущего отчества
+    entry_middle_name.pack(pady=5)  # Упаковка поля
+
+    lbl_position = Label(edit_resume_window, text="Должность:")  # Метка для должности
+    lbl_position.pack(pady=5)  # Упаковка метки
+    entry_position = Entry(edit_resume_window)  # Поле ввода должности
+    job_title = header_parts[-1] if len(header_parts) > 1 else ""  # Получаем должность из заголовка
+    entry_position.insert(0, job_title)  # Ввод текущей должности
+    entry_position.pack(pady=5)  # Упаковка поля
+
+    lbl_skills = Label(edit_resume_window, text="Навыки:")  # Метка для навыков
+    lbl_skills.pack(pady=5)  # Упаковка метки
+    entry_skills = Entry(edit_resume_window)  # Поле ввода навыков
+    entry_skills.insert(0, resume[3])  # Заполнение текущими навыками
+    entry_skills.pack(pady=5)  # Упаковка поля
+
+    def save_edited_resume():
+        new_first_name = entry_first_name.get()  # Получаем новое имя
+        new_last_name = entry_last_name.get()  # Получаем новую фамилию
+        new_middle_name = entry_middle_name.get()  # Получаем новое отчество
+        new_position = entry_position.get()  # Получаем новую должность
+        new_skills = entry_skills.get()  # Получаем новые навыки
+
+        # Обновляем резюме в базе данных
+        conn = sqlite3.connect('users.db')  # открываем соединение
+        cursor = conn.cursor()  # создаем курсор
+        new_title = f"{new_first_name} {new_last_name} {new_middle_name} - {new_position}"  # Создаем новый заголовок
+        cursor.execute('''
+            UPDATE resumes SET title=?, description=? WHERE id=?
+        ''', (new_title, new_skills, resume[0]))  # Обновляем данные резюме
+        conn.commit()  # Сохраняем изменения
+        conn.close()  # Закрываем соединение
+        edit_resume_window.destroy()  # Закрываем окно после сохранения
+
+    btn_save = ttk.Button(edit_resume_window, text="Сохранить изменения", command=save_edited_resume)
+    btn_save.pack(pady=20)  # Упаковка кнопки
+
+    def delete_resume():
+        result = messagebox.askquestion('Подтверждение', 'Вы действительно хотите удалить это резюме?')  # Запрос на подтверждение удаления
+        if result == 'yes':  # Если пользователь подтвердил
+            conn = sqlite3.connect('users.db')  # открываем соединение
+            cursor = conn.cursor()  # создаем курсор
+            cursor.execute("DELETE FROM resumes WHERE id=?", (resume[0],))  # Удаляем резюме по ID
+            conn.commit()  # Сохраняем изменения
+            conn.close()  # Закрываем соединение
+            edit_resume_window.destroy()  # Закрываем окно после удаления
+            messagebox.showinfo("Успех", "Резюме успешно удалено.")  # Сообщаем об успешном удалении
+
+    btn_delete = ttk.Button(edit_resume_window, text="Удалить резюме", command=delete_resume)
+    btn_delete.pack(pady=10)  # Упаковка кнопки
+
+    # Кнопка "Назад"
+    btn_back = ttk.Button(edit_resume_window, text="Назад", command=edit_resume_window.destroy)
+    btn_back.pack(pady=(10))  # Упаковка кнопки
+
+root = Tk()  # создаем корневой объект - окно
+root.title("Трудоустройство")  # устанавливаем заголовок окна
+root.geometry("300x250")  # устанавливаем размеры окна
+
+# Функция для авторизации пользователя
+def authorize_user(window):  # Изменяем на передачу window в качестве аргумента
+    username = entry_username.get()  # Получаем имя пользователя
+    password = entry_password.get()  # Получаем пароль
+    conn = sqlite3.connect('users.db')  # открываем соединение
+    cursor = conn.cursor()  # создаем курсор
+    cursor.execute('SELECT * FROM users WHERE username=? AND password=?', (username, password))  # Проверка учетных данных
+    user = cursor.fetchone()  # Получаем пользователя
+    conn.close()  # Закрываем соединение
+    if user:  # Если пользователь найден
+        user_id = user[0]  # Получаем ID пользователя
+        open_vacancies_window(user_id)  # Открываем окно с вакансиями
+        window.destroy()  # Закрываем окно авторизации
+    else:
+        print("Неверные учетные данные")  # Сообщаем об ошибке в консоль
+
+def user_login():  # Вход для пользователя
+    global entry_username, entry_password  # Заранее объявляем переменные
+    window = Toplevel()  # создаем верхнее окно
+    window.title("Вход")  # устанавливаем заголовок окна
+    window.geometry("250x200")  # устанавливаем размеры окна
+
+    # Метки
+    lbl_username = Label(window, text="Имя пользователя:")  # Метка для имени пользователя
+    lbl_username.grid(row=0, column=0, padx=10, pady=10)  # Упаковка метки
+
+    lbl_password = Label(window, text="Пароль:")  # Метка для пароля
+    lbl_password.grid(row=1, column=0, padx=10, pady=10)  # Упаковка метки
+
+    # Поля ввода
+    entry_username = Entry(window)  # Поле ввода имени пользователя
+    entry_username.grid(row=0, column=1, padx=10, pady=10)  # Упаковка поля
+
+    entry_password = Entry(window, show='*')  # Поле ввода пароля
+    entry_password.grid(row=1, column=1, padx=10, pady=10)  # Упаковка поля
+
+    # Кнопка авторизации
+    btn_submit = ttk.Button(window, text="Вход", command=lambda: authorize_user(window))  # Передаем окно в функцию
+    btn_submit.grid(row=2, columnspan=2, pady=(10))  # Упаковка кнопки
+
+    def go_back():  # Функция для возврата на предыдущую страницу
+        window.destroy()  # закрываем текущее окно
+
+    btn_back = ttk.Button(window, text="Назад", command=go_back)  # Кнопка "Назад"
+    btn_back.grid(row=3, columnspan=2)  # Упаковка кнопки
+
+btn1 = ttk.Button(text="Войти", command=user_login)  # Кнопка "Войти"
+btn1.grid(row=2, column=0, ipadx=6, ipady=6, padx=5, pady=5)  # Упаковка кнопки
+
+def authorize_user(window):
+    username = entry_username.get()  # Получаем имя пользователя
+    password = entry_password.get()  # Получаем пароль
+    conn = sqlite3.connect('users.db')  # открываем соединение
+    cursor = conn.cursor()  # создаем курсор
+    cursor.execute('SELECT * FROM users WHERE username=? AND password=?', (username, password))  # Проверка учетных данных
+    user = cursor.fetchone()  # Получаем пользователя
+    conn.close()  # Закрываем соединение
+    if user:  # Если пользователь найден
+        user_id = user[0]  # Получаем ID пользователя
+        open_vacancies_window(user_id)  # Открываем окно с вакансиями
+        window.destroy()  # Закрываем окно авторизации
+    else:
+        # Здесь мы добавляем вызов для отображения сообщения об ошибке
+        messagebox.showerror("Ошибка", "Неверные учетные данные. Пожалуйста, проверьте имя пользователя и пароль.")  # Сообщение об ошибке
+
+def register_user():  # Регистрация пользователя
+    window = Toplevel()  # создаем верхнее окно
+    window.title("Регистрация")  # устанавливаем заголовок окна
+    window.geometry("250x250")  # устанавливаем размеры окна
+
+    # Метки
+    lbl_username = Label(window, text="Имя пользователя:")  # Метка для имени пользователя
+    lbl_username.grid(row=0, column=0, padx=10, pady=10)  # Упаковка метки
+
+    lbl_password = Label(window, text="Пароль:")  # Метка для пароля
+    lbl_password.grid(row=1, column=0, padx=10, pady=10)  # Упаковка метки
+
+    lbl_email = Label(window, text="e-mail:")  # Метка для email
+    lbl_email.grid(row=2, column=0, padx=10, pady=10)  # Упаковка метки
+
+    lbl_phone = Label(window, text="Номер телефона:")  # Метка для номера телефона
+    lbl_phone.grid(row=3, column=0, padx=10, pady=10)  # Упаковка метки
+
+    # Поля ввода
+    entry_username = Entry(window)  # Поле ввода имени пользователя
+    entry_username.grid(row=0, column=1, padx=10, pady=10)  # Упаковка поля
+
+    entry_password = Entry(window, show='*')  # Поле ввода пароля
+    entry_password.grid(row=1, column=1, padx=10, pady=10)  # Упаковка поля
+
+    entry_email = Entry(window)  # Поле ввода email
+    entry_email.grid(row=2, column=1, padx=10, pady=10)  # Упаковка поля
+
+    entry_phone = Entry(window)  # Поле ввода номера телефона
+    entry_phone.grid(row=3, column=1, padx=10, pady=10)  # Упаковка поля
+
+    # Кнопка сохранения данных пользователя
+    def save_user():  # Функция для сохранения данных пользователя
+        username = entry_username.get()  # Получаем имя пользователя
+        password = entry_password.get()  # Получаем пароль
+        email = entry_email.get()  # Получаем email
+        phone = entry_phone.get()  # Получаем номер телефона
+        # Сохраняем данные пользователя в базе данных
+        conn = sqlite3.connect('users.db')  # открываем соединение
+        cursor = conn.cursor()  # создаем курсор
+        cursor.execute('''
+        INSERT INTO users (username, password, email, phone) VALUES (?, ?, ?, ?)
+        ''', (username, password, email, phone))  # Вставляем данные пользователя
+        conn.commit()  # Сохраняем изменения
+        conn.close()  # Закрываем соединение
+        window.destroy()  # Закрываем окно после сохранения
+
+    btn_register = ttk.Button(window, text="Зарегистрироваться", command=save_user)  # Кнопка регистрации
+    btn_register.grid(row=4, columnspan=2, pady=(10))  # Упаковка кнопки
+
+    def go_back():  # Функция для возврата на предыдущую страницу
+        window.destroy()  # закрываем текущее окно
+
+    btn_back = ttk.Button(window, text="Назад", command=go_back)  # Кнопка "Назад"
+    btn_back.grid(row=5, columnspan=2)  # Упаковка кнопки
+
+# Кнопка для регистрации пользователя
+btn_register = ttk.Button(text="Регистрация", command=register_user)
+btn_register.grid(row=1, column=0, ipadx=6, ipady=6, padx=5, pady=5)  # Упаковка кнопки
+
+def open_resume_window(user_id):  # Окно для добавления резюме
+    window = Toplevel()  # создаем верхнее окно
+    window.title("Добавить резюме")  # устанавливаем заголовок окна
+    window.geometry("500x500")  # устанавливаем размеры окна
+
+    lbl_first_name = Label(window, text="Имя:")  # Метка для имени
+    lbl_first_name.pack(pady=5)  # Упаковка метки
+    entry_first_name = Entry(window)  # Поле ввода имени
+    entry_first_name.pack(pady=5)  # Упаковка поля
+
+    lbl_last_name = Label(window, text="Фамилия:")  # Метка для фамилии
+    lbl_last_name.pack(pady=5)  # Упаковка метки
+    entry_last_name = Entry(window)  # Поле ввода фамилии
+    entry_last_name.pack(pady=5)  # Упаковка поля
+
+    lbl_middle_name = Label(window, text="Отчество:")  # Метка для отчества
+    lbl_middle_name.pack(pady=5)  # Упаковка метки
+    entry_middle_name = Entry(window)  # Поле ввода отчества
+    entry_middle_name.pack(pady=5)  # Упаковка поля
+
+    lbl_phone = Label(window, text="Номер телефона:")  # Метка для номера телефона
+    lbl_phone.pack(pady=5)  # Упаковка метки
+    entry_phone = Entry(window)  # Поле ввода номера телефона
+    entry_phone.pack(pady=5)  # Упаковка поля
+
+    lbl_position = Label(window, text="Должность:")  # Метка для должности
+    lbl_position.pack(pady=5)  # Упаковка метки
+    entry_position = Entry(window)  # Поле ввода должности
+    entry_position.pack(pady=5)  # Упаковка поля
+
+    lbl_skills = Label(window, text="Навыки:")  # Метка для навыков
+    lbl_skills.pack(pady=5)  # Упаковка метки
+    entry_skills = Entry(window)  # Поле ввода навыков
+    entry_skills.pack(pady=5)  # Упаковка поля
+
+    def save_resume():  # Функция для сохранения резюме
+        first_name = entry_first_name.get()  # Получаем имя
+        last_name = entry_last_name.get()  # Получаем фамилию
+        middle_name = entry_middle_name.get()  # Получаем отчество
+        phone = entry_phone.get()  # Получаем номер телефона
+        position = entry_position.get()  # Получаем должность
+        skills = entry_skills.get()  # Получаем навыки
+
+        conn = sqlite3.connect('users.db')  # открываем соединение
+        cursor = conn.cursor()  # создаем курсор
+        cursor.execute('''
+           INSERT INTO resumes (user_id, title, description) VALUES (?, ?, ?)
+           ''', (user_id, f"{first_name} {last_name} {middle_name} - {position}", skills))  # Вставляем новое резюме
+        conn.commit()  # Сохраняем изменения
+        conn.close()  # Закрываем соединение
+        window.destroy()  # Закрываем окно после сохранения
+
+    btn_save = ttk.Button(window, text="Сохранить резюме", command=save_resume)  # Кнопка для сохранения резюме
+    btn_save.pack(pady=20)  # Упаковка кнопки
+
+    # Кнопка "Назад"
+    def go_back():  # Функция для возврата на предыдущую страницу
+        window.destroy()  # закрываем текущее окно
+
+    btn_back = ttk.Button(window, text="Назад", command=go_back)  # Кнопка "Назад"
+    btn_back.pack(pady=(10))  # Упаковка кнопки
+
+def admin_login():  # Вход для администратора
+    window = Toplevel()  # создаем верхнее окно
+    window.title("Вход для администратора")  # устанавливаем заголовок окна
+    window.geometry("300x300")  # устанавливаем размеры окна
+
+    # Метки
+    lbl_username = Label(window, text="Имя пользователя:")  # Метка для имени пользователя
+    lbl_username.grid(row=0, column=0, padx=10, pady=10)  # Упаковка метки
+
+    lbl_password = Label(window, text="Пароль:")  # Метка для пароля
+    lbl_password.grid(row=1, column=0, padx=10, pady=10)  # Упаковка метки
+
+    entry_username = Entry(window)  # Поле ввода имени пользователя
+    entry_username.grid(row=0, column=1, padx=10, pady=10)  # Упаковка поля
+
+    entry_password = Entry(window, show='*')  # Поле ввода пароля
+    entry_password.grid(row=1, column=1, padx=10, pady=10)  # Упаковка поля
+
+    def on_submit():  # Функция для обработки нажатия кнопки "Далее"
+        username = entry_username.get()  # Получаем имя пользователя
+        password = entry_password.get()  # Получаем пароль
+        if username == 'admin' and password == 'admin_pass':  # Проверка учетных данных
+            open_admin_menu()  # Открываем меню администратора
+            window.destroy()  # Закрываем текущее окно
+        else:
+            # Добавляем вызов сообщения об ошибке
+            messagebox.showerror("Ошибка", "Неверные учетные данные для администратора. Пожалуйста, проверьте имя пользователя и пароль.")  # Сообщение об ошибке
+
+    btn_submit = ttk.Button(window, text="Далее", command=on_submit)  # Кнопка "Далее"
+    btn_submit.grid(row=2, columnspan=2, pady=(10))  # Упаковка кнопки
+
+    def go_back():  # Функция для возврата на предыдущую страницу
+        window.destroy()  # Закрываем текущее окно
+
+    btn_back = ttk.Button(window, text="Назад", command=go_back)  # Кнопка "Назад"
+    btn_back.grid(row=3, columnspan=2)  # Упаковка кнопки
+
+def open_admin_menu():  # Функция для открытия меню администратора
+    admin_menu = Toplevel()  # создаем верхнее окно
+    admin_menu.title("Меню администратора")  # устанавливаем заголовок окна
+    admin_menu.geometry("600x600")  # устанавливаем размеры окна
+
+    # Кнопки для просмотра пользователей и резюме
+    btn_view_users = ttk.Button(admin_menu, text="Посмотреть пользователей", command=open_user_data)  # Кнопка для просмотра пользователей
+    btn_view_users.pack(pady=10)  # Упаковка кнопки
+
+    # Изменяем кнопку просмотра резюме, чтобы передать user_id
+    btn_view_resumes = ttk.Button(admin_menu, text="Посмотреть резюме", command=lambda: open_resumes_window(None))  # Кнопка для просмотра резюме
+    btn_view_resumes.pack(pady=10)  # Упаковка кнопки
+
+    # Кнопка для экспорта вакансий в Excel
+    btn_export_vacancies = ttk.Button(admin_menu, text="Экспортировать вакансии в Excel",
+                                      command=export_vacancies_to_excel)  # Кнопка для экспорта вакансий
+    btn_export_vacancies.pack(pady=10)  # Упаковка кнопки
+
+def open_user_data():  # Функция для отображения зарегистрированных пользователей
+    user_window = Toplevel()  # создаем верхнее окно
+    user_window.title("Зарегистрированные пользователи")  # устанавливаем заголовок окна
+    user_window.geometry("500x500")  # устанавливаем размеры окна
+
+    tree = ttk.Treeview(user_window, columns=("ID", "Username", "Email", "Phone"), show="headings")  # Создаем таблицу для пользователей
+    tree.heading("ID", text="ID")  # Заголовок колонки ID
+    tree.heading("Username", text="Имя пользователя")  # Заголовок колонки Имя пользователя
+    tree.heading("Email", text="e-mail")  # Заголовок колонки e-mail
+    tree.heading("Phone", text="Телефон")  # Заголовок колонки Телефон
+
+    # Загружаем данные о пользователях из базы данных
+    conn = sqlite3.connect('users.db')  # открываем соединение
+    cursor = conn.cursor()  # создаем курсор
+    cursor.execute("SELECT * FROM users")  # Выполняем запрос на получение пользователей
+    users = cursor.fetchall()  # Получаем всех пользователей
+
+    for user in users:  # Вставляем пользователей в таблицу
+        tree.insert("", "end", values=user)  # Добавляем данные пользователей в таблицу
+
+    tree.pack(expand=True, fill='both')  # Упаковка дерева для отображения
+
+    # Функция для удаления пользователя
+    def delete_user():  # Функция для удаления пользователя
+        selected_item = tree.selection()  # Получаем выделенный элемент
+        if selected_item:
+            user_id = tree.item(selected_item, 'values')[0]  # Получаем ID пользователя
+            conn = sqlite3.connect('users.db')  # открываем соединение
+            cursor = conn.cursor()  # создаем курсор
+            cursor.execute("DELETE FROM users WHERE id=?", (user_id,))  # Удаляем пользователя по ID
+            conn.commit()  # Сохраняем изменения
+            conn.close()  # Закрываем соединение
+            tree.delete(selected_item)  # Удаляем элемент из Treeview
+        else:
+            print("Выберите пользователя для удаления")  # Сообщение об ошибке
+
+    # Кнопка удаления пользователя
+    btn_delete = ttk.Button(user_window, text="Удалить пользователя", command=delete_user)  # Кнопка для удаления пользователя
+    btn_delete.pack(pady=(10))  # Упаковка кнопки
+
+    # Кнопка "Назад"
+    btn_back = ttk.Button(user_window, text="Назад", command=user_window.destroy)  # Кнопка "Назад"
+    btn_back.pack(pady=(10))  # Упаковка кнопки
+
+    conn.close()  # Закрываем соединение
+
+def open_resumes_window(user_id):  # Функция для отображения всех резюме пользователя
+    resumes_window = Toplevel()  # создаем верхнее окно
+    resumes_window.title("Ваши резюме")  # устанавливаем заголовок окна
+    resumes_window.geometry("400x300")  # устанавливаем размеры окна
+
+    tree = ttk.Treeview(resumes_window, columns=("ID", "User ID", "Title", "Description"), show="headings")  # Создаем таблицу для резюме
+    tree.heading("ID", text="ID")  # Заголовок колонки ID
+    tree.heading("User ID", text="ID пользователя")  # Заголовок колонки User ID
+    tree.heading("Title", text="Название резюме")  # Заголовок колонки Название резюме
+    tree.heading("Description", text="Описание")  # Заголовок колонки Описание
+
+    # Загружаем данные о резюме из базы данных
+    conn = sqlite3.connect('users.db')  # открываем соединение
+    cursor = conn.cursor()  # создаем курсор
+    cursor.execute("SELECT * FROM resumes WHERE user_id=?", (user_id,))  # Получаем резюме пользователя по ID
+    resumes = cursor.fetchall()  # Получаем все резюме
+
+    for resume in resumes:  # Вставляем резюме в таблицу
+        tree.insert("", "end", values=resume)  # Добавляем данные резюме в таблицу
+
+    tree.pack(expand=True, fill='both')  # Упаковка дерева для отображения
+
+    # Кнопка для удаления резюме
+    def delete_selected_resume():  # Функция для удаления выбранного резюме
+        selected_item = tree.selection()  # Получаем выделенный элемент
+        if selected_item:
+            resume_id = tree.item(selected_item, 'values')[0]  # Получаем ID резюме
+            conn = sqlite3.connect('users.db')  # открываем соединение
+            cursor = conn.cursor()  # создаем курсор
+            cursor.execute("DELETE FROM resumes WHERE id=?", (resume_id,))  # Удаляем резюме по ID
+            conn.commit()  # Сохраняем изменения
+            conn.close()  # Закрываем соединение
+            tree.delete(selected_item)  # Удаляем элемент из Treeview
+        else:
+            messagebox.showwarning("Внимание", "Выберите резюме для удаления.")  # Сообщение об ошибке
+
+    btn_delete_resume = ttk.Button(resumes_window, text="Удалить резюме", command=delete_selected_resume)  # Кнопка для удаления резюме
+    btn_delete_resume.pack(pady=(10))  # Упаковка кнопки
+
+    # Кнопка "Назад"
+    def go_back():  # Функция для возврата на предыдущую страницу
+        edit_resume_window.destroy()  # Закрываем текущее окно
+        previous_window.deiconify()  # Показываем предыдущее окно
+
+    btn_back = ttk.Button(edit_resume_window, text="Назад", command=go_back)  # Кнопка "Назад"
+    btn_back.pack(pady=(10))  # Упаковка кнопки
+
+    conn.close()  # Закрываем соединение
+
+def open_all_resumes_window(previous_window=None):  # Передаем предыдущие окно
+    all_resumes_window = Toplevel()  # создаем верхнее окно
+    all_resumes_window.title("Все резюме")  # устанавливаем заголовок окна
+    all_resumes_window.geometry("600x400")  # устанавливаем размеры окна
+
+    # Создаем таблицу для просмотра всех резюме
+    tree = ttk.Treeview(all_resumes_window, columns=("ID", "Username", "First Name", "Last Name", "Middle Name", "Phone", "Position", "Skills"), show="headings")
+    tree.heading("ID", text="ID резюме")  # Заголовок колонки ID резюме
+    tree.heading("Username", text="Имя пользователя")  # Заголовок колонки Имя пользователя
+    tree.heading("First Name", text="Имя")  # Заголовок колонки Имя
+    tree.heading("Last Name", text="Фамилия")  # Заголовок колонки Фамилия
+    tree.heading("Middle Name", text="Отчество")  # Заголовок колонки Отчество
+    tree.heading("Phone", text="Номер телефона")  # Заголовок колонки Номер телефона
+    tree.heading("Position", text="Должность")  # Заголовок колонки Должность
+    tree.heading("Skills", text="Навыки")  # Заголовок колонки Навыки
+
+    # Загружаем данные о всем резюме из базы данных, присоединяем таблицы
+    conn = sqlite3.connect('users.db')  # открываем соединение
+    cursor = conn.cursor()  # создаем курсор
+    cursor.execute('''
+        SELECT resumes.id, users.username, 
+               substr(resumes.title, 1, instr(resumes.title, ' ') - 1) as FirstName,
+               substr(resumes.title, instr(resumes.title, ' ') + 1, 
+                      instr(resumes.title, ' -') - instr(resumes.title, ' ') - 1) as LastName,
+               substr(resumes.title, instr(resumes.title, ' ') + instr(resumes.title, ' ')) as MiddleName,
+               users.phone,
+               substr(resumes.title, instr(resumes.title, ' - ') + 3) as Position,
+               resumes.description as Skills
+        FROM resumes
+        JOIN users ON resumes.user_id = users.id
+    ''')  # Получаем резюме вместе с данными пользователей
+    resumes = cursor.fetchall()  # Получаем все резюме
+
+    for resume in resumes:  # Вставляем резюме в таблицу
+        tree.insert("", "end", values=resume)  # Добавляем данные резюме в таблицу
+
+    tree.pack(expand=True, fill='both')  # Упаковка дерева для отображения
+
+    # Кнопка для удаления резюме
+    def delete_selected_resume():  # Функция для удаления выбранного резюме
+        selected_item = tree.selection()  # Получаем выделенный элемент
+        if selected_item:
+            resume_id = tree.item(selected_item, 'values')[0]  # Получаем ID резюме
+            conn = sqlite3.connect('users.db')  # открываем соединение
+            cursor = conn.cursor()  # создаем курсор
+            cursor.execute("DELETE FROM resumes WHERE id=?", (resume_id,))  # Удаляем резюме по ID
+            conn.commit()  # Сохраняем изменения
+            conn.close()  # Закрываем соединение
+            tree.delete(selected_item)  # Удаляем элемент из Treeview
+        else:
+            messagebox.showwarning("Внимание", "Выберите резюме для удаления.")  # Сообщение об ошибке
+
+    btn_delete_resume = ttk.Button(all_resumes_window, text="Удалить резюме", command=delete_selected_resume)  # Кнопка для удаления резюме
+    btn_delete_resume.pack(pady=(10))  # Упаковка кнопки
+
+    def go_back():  # Функция для возврата на предыдущую страницу
+        all_resumes_window.destroy()  # Закрываем текущее окно
+        if previous_window:  # Проверяем, если есть предыдущее окно
+            previous_window.deiconify()  # Показываем предыдущие окно
+
+    btn_back = ttk.Button(all_resumes_window, text="Назад", command=go_back)  # Кнопка "Назад"
+    btn_back.pack(pady=(10))  # Упаковка кнопки
+
+    conn.close()  # Закрываем соединение
+
+# Функция для открытия меню администратора
+def open_admin_menu():
+    admin_menu = Toplevel()  # создаем верхнее окно
+    admin_menu.title("Меню администратора")  # устанавливаем заголовок окна
+    admin_menu.geometry("300x200")  # устанавливаем размеры окна
+
+    # Кнопки для просмотра пользователей и резюме
+    btn_view_users = ttk.Button(admin_menu, text="Посмотреть пользователей", command=open_user_data)  # Кнопка для просмотра пользователей
+    btn_view_users.pack(pady=10)  # Упаковка кнопки
+
+    # Кнопка для просмотра всех резюме
+    btn_view_all_resumes = ttk.Button(admin_menu, text="Посмотреть все резюме", command=open_all_resumes_window)  # Кнопка для просмотра всех резюме
+    btn_view_all_resumes.pack(pady=10)  # Упаковка кнопки
+
+    # Кнопка для экспорта вакансий в Excel
+    btn_export_vacancies = ttk.Button(admin_menu, text="Экспортировать вакансии в Excel",
+                                      command=export_vacancies_to_excel)  # Кнопка для экспорта вакансий
+    btn_export_vacancies.pack(pady=10)  # Упаковка кнопки
+
+btn3 = ttk.Button(root, text="Вход для администратора", command=admin_login)  # Кнопка "Вход для администратора"
+btn3.grid(row=0, column=0, ipadx=6, ipady=6, padx=5, pady=5, sticky='n')  # Упаковка кнопки
+root.grid_columnconfigure(0, weight=1)  # Конфигурация колонки
+
+# Запуск главного цикла обработки событий
+root.mainloop()
